@@ -1,0 +1,21 @@
+# --- UI ---
+PyQt6>=6.6
+
+# --- Computer vision & landmark ---
+opencv-python>=4.9
+mediapipe>=0.10.14   # versi Tasks API (FaceLandmarker), bukan legacy mp.solutions
+
+# --- Model kata (GRU/Keras) ---
+tensorflow>=2.15     # ganti tflite-runtime kalau MiniPC ingin lebih ringan & model sudah dikonversi ke .tflite
+numpy>=1.26
+
+# --- Audio (opsional, dipakai modul pitch/haptic untuk ERIC) ---
+pyaudio>=0.2.14       # Linux: install dulu `sudo apt install portaudio19-dev` sebelum pip install
+
+# --- Serial ke mikrokontroler (motor haptic & joystick) ---
+pyserial>=3.5
+
+# --- Dipakai saat training/eksperimen model vokal (Bagian 1 notebook), opsional untuk runtime app ---
+scikit-learn>=1.4
+pandas>=2.2
+joblib>=1.3
