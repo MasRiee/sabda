@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SABDA - Dashboard Pendamping</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        font-family: 'Segoe UI', sans-serif;
+        background: #ffffff;
+        color: #1e293b;
+        min-height: 100vh;
+        padding: 1.5rem;
+    }
+
+    /* ── Header ── */
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    .logo { font-size: 1.5rem; font-weight: bold; color: #0ea5e9; }
+    .logo span { color: #64748b; font-weight: normal; font-size: 0.85rem; display: block; }
+    .live-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #f1f5f9;
+        padding: 6px 14px;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+    .dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    button.reset-btn {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #64748b;
+        padding: 6px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-family: 'Segoe UI', sans-serif;
+        transition: background 0.2s;
+    }
+    button.reset-btn:hover { background: #e2e8f0; color: #1e293b; }
+
+    /* ── Grid Layout ── */
+    .grid-top {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .grid-mid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .grid-bottom {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    @media (max-width: 700px) {
+        .grid-mid, .grid-bottom { grid-template-columns: 1fr; }
+    }
+
+    /* ── Card ── */
+    .card {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .card-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+        margin-bottom: 0.4rem;
+    }
+    .card-value {
+        font-size: 1.9rem;
+        font-weight: bold;
+        color: #1e293b;
+    }
+    .card-value.correct { color: #16a34a; }
+    .card-value.incorrect { color: #dc2626; }
+    .card-value.idle { color: #94a3b8; }
+    .card-sub {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        margin-top: 0.3rem;
+    }
+
+    .conf-bar {
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        margin-top: 0.6rem;
+        overflow: hidden;
+    }
+    .conf-fill {
+        height: 100%;
+        background: #0ea5e9;
+        border-radius: 3px;
+        transition: width 0.4s ease;
+        width: 0%;
+    }
+
+    /* ── Tabel kata ── */
+    .word-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .word-table th {
+        text-align: left;
+        color: #64748b;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 0 0 0.6rem 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .word-table td {
+        padding: 0.55rem 0;
+        border-bottom: 1px solid #f1f5f9;
+        color: #374151;
+    }
+    .word-table tr:last-child td { border-bottom: none; }
+
+    .pct-bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .pct-bar-bg {
+        flex: 1;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .pct-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: #16a34a;
+        transition: width 0.4s;
+    }
+    .pct-bar-fill.mid { background: #d97706; }
+    .pct-bar-fill.low { background: #dc2626; }
+
+    /* ── Riwayat ── */
+    .history-list { list-style: none; max-height: 240px; overflow-y: auto; }
+    .history-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.82rem;
+        gap: 8px;
+    }
+    .history-item:last-child { border-bottom: none; }
+    .history-time { color: #94a3b8; font-size: 0.72rem; min-width: 55px; }
+    .history-words { flex: 1; color: #374151; }
+    .history-words .arrow { color: #94a3b8; margin: 0 4px; }
+    .badge {
+        padding: 2px 8px;
+        border-radius: 9999px;
+        font-size: 0.7rem;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+    .badge.ok { background: #dcfce7; color: #15803d; }
+    .badge.fail { background: #fee2e2; color: #b91c1c; }
+
+    /* ── Chart ── */
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Empty state ── */
+    .empty {
+        color: #94a3b8;
+        font-size: 0.82rem;
+        padding: 1rem 0;
+        text-align: center;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    🗣️ SABDA
+    <span>Dashboard Pendamping — Monitor Progres Belajar Siswa</span>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <div class="live-badge"><div class="dot"></div> Live</div>
+    <button class="reset-btn" onclick="resetSession()">↺ Reset Sesi</button>
+  </div>
+</header>
+
+<!-- Baris 1: Statistik ringkas -->
+<div class="grid-top">
+  <div class="card">
+    <div class="card-label">Kata Target Saat Ini</div>
+    <div class="card-value" id="target-word">-</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Kata Terdeteksi</div>
+    <div class="card-value" id="predicted-word">-</div>
+    <div class="card-sub" id="confidence-text">Confidence: -</div>
+    <div class="conf-bar"><div class="conf-fill" id="conf-fill"></div></div>
+  </div>
+  <div class="card">
+    <div class="card-label">Hasil</div>
+    <div class="card-value idle" id="result">-</div>
+    <div class="card-sub" id="last-time">-</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Percobaan</div>
+    <div class="card-value" id="total-attempts">0</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Keberhasilan</div>
+    <div class="card-value correct" id="total-correct">0</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Tingkat Keberhasilan</div>
+    <div class="card-value" id="success-rate">0%</div>
+    <div class="card-sub">Keseluruhan sesi</div>
+  </div>
+</div>
+
+<!-- Baris 2: Tabel per kata + Chart harian -->
+<div class="grid-mid">
+  <div class="card">
+    <div class="card-label" style="margin-bottom:0.8rem;">Progres per Kata</div>
+    <table class="word-table">
+      <thead>
+        <tr>
+          <th>Kata</th>
+          <th>Coba</th>
+          <th>Berhasil</th>
+          <th style="width:40%">Keberhasilan</th>
+        </tr>
+      </thead>
+      <tbody id="word-table-body">
+        <tr><td colspan="4" class="empty">Belum ada data latihan</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-label" style="margin-bottom:0.8rem;">
+      Perkembangan Harian
+    </div>
+    <div class="chart-wrap">
+      <canvas id="daily-chart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Baris 3: Chart per kata + Riwayat -->
+<div class="grid-bottom">
+  <div class="card">
+    <div class="card-label" style="margin-bottom:0.8rem;">
+      Tingkat Keberhasilan per Kata
+    </div>
+    <div class="chart-wrap">
+      <canvas id="word-chart"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label" style="margin-bottom:0.8rem;">Riwayat Percobaan</div>
+    <ul class="history-list" id="history-list">
+      <li class="empty">Belum ada riwayat</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  const socket = io();
+
+  // ── Chart Setup ────────────────────────────────────────────────
+  const dailyCtx = document.getElementById('daily-chart').getContext('2d');
+  const wordCtx  = document.getElementById('word-chart').getContext('2d');
+
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+        x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+        y: {
+        ticks: { color: '#64748b', font: { size: 10 },
+                callback: v => v + '%' },
+        grid: { color: '#e2e8f0' },
+        min: 0, max: 100
+        }
+        }
+    };
+
+  const dailyChart = new Chart(dailyCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56,189,248,0.1)',
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: '#38bdf8',
+        pointRadius: 4,
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+
+  const wordChart = new Chart(wordCtx, {
+    type: 'bar',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        backgroundColor: [],
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      plugins: { legend: { display: false } },
+    }
+  });
+
+  // ── Helper ─────────────────────────────────────────────────────
+  function pctColor(pct) {
+    if (pct >= 70) return '#22c55e';
+    if (pct >= 40) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  function pctBarClass(pct) {
+    if (pct >= 70) return '';
+    if (pct >= 40) return 'mid';
+    return 'low';
+  }
+
+  // ── Update UI ──────────────────────────────────────────────────
+  socket.on('update', ({ latest, stats }) => {
+    // Kartu atas
+    document.getElementById('target-word').textContent =
+      (latest.target_word || '-').toUpperCase();
+
+    const pred = document.getElementById('predicted-word');
+    pred.textContent = (latest.predicted_word || '-').toUpperCase();
+
+    const conf = Math.round((latest.confidence || 0) * 100);
+    document.getElementById('confidence-text').textContent = `Confidence: ${conf}%`;
+    document.getElementById('conf-fill').style.width = conf + '%';
+
+    const resultEl = document.getElementById('result');
+    if (latest.correct === true) {
+      resultEl.textContent = '✅ BENAR';
+      resultEl.className = 'card-value correct';
+    } else if (latest.correct === false) {
+      resultEl.textContent = '❌ SALAH';
+      resultEl.className = 'card-value incorrect';
+    } else {
+      resultEl.textContent = '-';
+      resultEl.className = 'card-value idle';
+    }
+    document.getElementById('last-time').textContent =
+      latest.timestamp ? 'Pukul ' + latest.timestamp : '-';
+
+    // Statistik
+    const attempts = stats.total_attempts || 0;
+    const correct  = stats.total_correct  || 0;
+    const rate     = attempts > 0 ? Math.round(correct / attempts * 100) : 0;
+
+    document.getElementById('total-attempts').textContent = attempts;
+    document.getElementById('total-correct').textContent  = correct;
+    document.getElementById('success-rate').textContent   = rate + '%';
+    document.getElementById('success-rate').style.color   = pctColor(rate);
+
+    // Tabel per kata
+    const tbody = document.getElementById('word-table-body');
+    const wordStats = stats.word_stats || {};
+    const words = Object.keys(wordStats);
+    if (words.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">Belum ada data latihan</td></tr>';
+    } else {
+      tbody.innerHTML = words.map(w => {
+        const ws  = wordStats[w];
+        const pct = ws.attempts > 0 ? Math.round(ws.correct / ws.attempts * 100) : 0;
+        const cls = pctBarClass(pct);
+        return `
+          <tr>
+            <td>${w}</td>
+            <td>${ws.attempts}</td>
+            <td>${ws.correct}</td>
+            <td>
+              <div class="pct-bar-wrap">
+                <div class="pct-bar-bg">
+                  <div class="pct-bar-fill ${cls}" style="width:${pct}%"></div>
+                </div>
+                <span style="font-size:0.75rem;color:${pctColor(pct)};min-width:32px">
+                  ${pct}%
+                </span>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    // Chart per kata
+    const wordLabels = words.map(w => w.charAt(0).toUpperCase() + w.slice(1));
+    const wordData   = words.map(w => {
+      const ws = wordStats[w];
+      return ws.attempts > 0 ? Math.round(ws.correct / ws.attempts * 100) : 0;
+    });
+    wordChart.data.labels = wordLabels;
+    wordChart.data.datasets[0].data = wordData;
+    wordChart.data.datasets[0].backgroundColor = wordData.map(pctColor);
+    wordChart.update();
+
+    // Chart harian
+    const daily  = stats.daily_stats || {};
+    const dates  = Object.keys(daily).sort();
+    const dailyPct = dates.map(d => {
+      const ds = daily[d];
+      return ds.attempts > 0 ? Math.round(ds.correct / ds.attempts * 100) : 0;
+    });
+    dailyChart.data.labels = dates.map(d => {
+      const [, m, dd] = d.split('-');
+      return `${dd}/${m}`;
+    });
+    dailyChart.data.datasets[0].data = dailyPct;
+    dailyChart.update();
+
+    // Riwayat
+    const list    = document.getElementById('history-list');
+    const history = stats.history || [];
+    if (history.length === 0) {
+      list.innerHTML = '<li class="empty">Belum ada riwayat</li>';
+    } else {
+      list.innerHTML = history.map(h => `
+        <li class="history-item">
+          <span class="history-time">${h.time}</span>
+          <span class="history-words">
+            <b>${(h.target||'').toUpperCase()}</b>
+            <span class="arrow">→</span>
+            ${(h.predicted||'').toUpperCase()}
+          </span>
+          <span class="badge ${h.correct ? 'ok' : 'fail'}">
+            ${h.correct ? 'BENAR' : 'SALAH'} ${h.confidence}%
+          </span>
+        </li>`).join('');
+    }
+  });
+
+  // ── Reset sesi ─────────────────────────────────────────────────
+  function resetSession() {
+    if (confirm('Reset semua statistik sesi ini?')) {
+      socket.emit('reset_session');
+    }
+  }
+</script>
+</body>
+</html>
